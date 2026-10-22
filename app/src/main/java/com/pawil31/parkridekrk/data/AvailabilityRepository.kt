@@ -3,47 +3,54 @@ package com.pawil31.parkridekrk.data
 import android.content.Context
 import android.util.Log
 import com.pawil31.parkridekrk.core.AVAILABILITY_URL
-import com.pawil31.parkridekrk.core.PageContent
 import com.pawil31.parkridekrk.core.PageContentExtractor
+import com.pawil31.parkridekrk.core.PageFetcher
+import com.pawil31.parkridekrk.core.ParkingAvailability
+import com.pawil31.parkridekrk.core.ParkingParser
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+data class Availability(
+    /** Car parks read from the page, in page order. */
+    val parkings: List<ParkingAvailability>,
+    /** The page's text, filled only when no car parks could be read, so the driver still sees something. */
+    val pageText: List<String>,
+)
 
 /**
- * Loads the text content of the ZTP availability page. The page is rendered with JavaScript so that
- * numbers filled in client-side are included; embedded frames (a possible data widget) are appended.
+ * Loads the ZTP availability page. The car parks are in the page's HTML, so a plain download is
+ * enough; if that ever stops being the case, the page is rendered with JavaScript instead.
  */
 class AvailabilityRepository(private val context: Context) {
 
-    suspend fun load(): List<String> {
-        val page = render(AVAILABILITY_URL)
-        val frameLines = page.frameUrls.take(MAX_FRAMES).flatMap { frame ->
-            try {
-                render(frame).lines
+    /** Set once the downloaded HTML turned out not to contain the car parks, to skip that request next time. */
+    @Volatile
+    private var needsJavaScript = false
+
+    suspend fun load(): Availability {
+        if (!needsJavaScript) {
+            val html = try {
+                withContext(Dispatchers.IO) { PageFetcher.fetch(AVAILABILITY_URL) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w(TAG, "Could not load frame $frame", e)
-                emptyList()
+                Log.w(TAG, "Download failed, trying the rendered page", e)
+                null
+            }
+            if (html != null) {
+                val parkings = ParkingParser.parse(html)
+                if (parkings.isNotEmpty()) return Availability(parkings, emptyList())
+                needsJavaScript = true
             }
         }
-        return page.lines + frameLines
-    }
 
-    /** Renders [url] and returns its content once it has stopped changing. */
-    private suspend fun render(url: String): PageContent {
-        var previous: List<String>? = null
-        var stablePolls = 0
-        val html = WebViewHtmlLoader.load(context, url) { html ->
-            val lines = PageContentExtractor.extract(html, url).lines
-            stablePolls = if (lines.isNotEmpty() && lines == previous) stablePolls + 1 else 0
-            previous = lines
-            stablePolls >= STABLE_POLLS_NEEDED
-        }
-        return PageContentExtractor.extract(html, url)
+        val html = WebViewHtmlLoader.load(context, AVAILABILITY_URL) { ParkingParser.parse(it).isNotEmpty() }
+        val parkings = ParkingParser.parse(html)
+        return Availability(parkings, if (parkings.isEmpty()) PageContentExtractor.lines(html) else emptyList())
     }
 
     private companion object {
         const val TAG = "AvailabilityRepository"
-        const val MAX_FRAMES = 2
-        const val STABLE_POLLS_NEEDED = 2
     }
 }

@@ -1,11 +1,15 @@
 package com.pawil31.parkridekrk.car
 
+import android.text.SpannableStringBuilder
+import android.text.Spanned
 import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.CarColor
+import androidx.car.app.model.ForegroundCarColorSpan
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
@@ -15,6 +19,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.pawil31.parkridekrk.R
+import com.pawil31.parkridekrk.core.Occupancy
+import com.pawil31.parkridekrk.core.ParkingAvailability
+import com.pawil31.parkridekrk.data.Availability
 import com.pawil31.parkridekrk.data.AvailabilityRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -23,8 +30,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 /**
- * Shows the text of the ZTP availability page (without header and footer) on the car screen.
- * Refreshes every minute while it is on screen.
+ * Lists free spaces per P+R car park, colour-coded like the ZTP page. Refreshes every minute while it
+ * is on the car screen; the refresh button shows the time of the last update.
  *
  * The template type and title never change between refreshes, so hosts treat updates as refreshes
  * rather than new steps in the task flow.
@@ -34,7 +41,7 @@ class AvailabilityScreen(
     private val repository: AvailabilityRepository,
 ) : Screen(carContext) {
 
-    private var lines: List<String>? = null
+    private var availability: Availability? = null
     private var updatedAt: LocalTime? = null
     private var lastError: String? = null
     private var refreshing = false
@@ -55,7 +62,7 @@ class AvailabilityScreen(
         if (refreshing) return
         refreshing = true
         try {
-            lines = repository.load()
+            availability = repository.load()
             updatedAt = LocalTime.now()
             lastError = null
         } catch (e: CancellationException) {
@@ -75,8 +82,8 @@ class AvailabilityScreen(
             .setHeaderAction(Action.APP_ICON)
             .setActionStrip(ActionStrip.Builder().addAction(refreshAction()).build())
 
-        val content = lines
-        if (content == null) {
+        val data = availability
+        if (data == null) {
             val error = lastError ?: return template.setLoading(true).build()
             val list = ItemList.Builder()
                 .setNoItemsMessage(carContext.getString(R.string.load_error, error))
@@ -84,35 +91,76 @@ class AvailabilityScreen(
             return template.setSingleList(list).build()
         }
 
+        val rows = when {
+            data.parkings.isNotEmpty() -> parkingRows(data.parkings, listLimit())
+            else -> pageTextRows(data.pageText).take(listLimit())
+        }
         val list = ItemList.Builder()
-        // Keep the last slot for the status row so the driver always sees how fresh the data is.
-        contentRows(content).take(listLimit() - 1).forEach(list::addItem)
-        list.addItem(statusRow(content.isEmpty()))
+        if (rows.isEmpty()) list.setNoItemsMessage(carContext.getString(R.string.no_content))
+        rows.forEach(list::addItem)
         return template.setSingleList(list.build()).build()
     }
 
-    private fun refreshAction() = Action.Builder()
-        .setTitle(carContext.getString(R.string.refresh))
-        .setOnClickListener { lifecycleScope.launch { refresh() } }
-        .build()
+    private fun refreshAction(): Action {
+        val time = updatedAt?.format(TIME_FORMAT)
+        val title = when {
+            time == null -> carContext.getString(R.string.refresh)
+            lastError != null -> carContext.getString(R.string.refresh_failed_at, time)
+            else -> carContext.getString(R.string.refresh_at, time)
+        }
+        return Action.Builder()
+            .setTitle(title)
+            .setOnClickListener { lifecycleScope.launch { refresh() } }
+            .build()
+    }
 
-    /** Page text packed three lines per row: the row title plus its two text lines. */
-    private fun contentRows(content: List<String>): List<Row> =
-        content.chunked(LINES_PER_ROW).map { chunk ->
+    /** One row per car park; if they don't all fit, the last row lists the rest. */
+    private fun parkingRows(parkings: List<ParkingAvailability>, limit: Int): List<Row> {
+        if (parkings.size <= limit) return parkings.map(this::parkingRow)
+        val rest = parkings.drop(limit - 1)
+        val overflow = Row.Builder().setTitle(carContext.getString(R.string.other_parkings))
+        rest.chunked((rest.size + 1) / 2).forEach { line ->
+            val text = SpannableStringBuilder()
+            line.forEachIndexed { i, parking ->
+                if (i > 0) text.append(" · ")
+                appendColored(text, carContext.getString(R.string.free_short, shortName(parking), parking.freeSpaces), parking)
+            }
+            overflow.addText(text)
+        }
+        return parkings.take(limit - 1).map(this::parkingRow) + overflow.build()
+    }
+
+    private fun parkingRow(parking: ParkingAvailability): Row {
+        val text = SpannableStringBuilder()
+        appendColored(text, carContext.getString(R.string.free, parking.freeSpaces), parking)
+        return Row.Builder().setTitle(shortName(parking)).addText(text).build()
+    }
+
+    private fun appendColored(text: SpannableStringBuilder, part: String, parking: ParkingAvailability) {
+        val start = text.length
+        text.append(part)
+        text.setSpan(ForegroundCarColorSpan.create(colorFor(parking)), start, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+
+    private fun colorFor(parking: ParkingAvailability): CarColor = when (parking.occupancy) {
+        Occupancy.LOW -> CarColor.GREEN
+        Occupancy.HIGH -> CarColor.YELLOW
+        Occupancy.FULL -> CarColor.RED
+        null -> when {
+            parking.freeSpaces == 0 -> CarColor.RED
+            parking.freeSpaces < 20 -> CarColor.YELLOW
+            else -> CarColor.GREEN
+        }
+    }
+
+    /** The screen title already says "P+R", so drop it from each name. */
+    private fun shortName(parking: ParkingAvailability) = parking.name.removePrefix("P+R").trim()
+
+    /** Fallback when the car parks can't be read: the page text, three lines per row. */
+    private fun pageTextRows(lines: List<String>): List<Row> =
+        lines.chunked(LINES_PER_ROW).map { chunk ->
             Row.Builder().setTitle(chunk[0]).apply { chunk.drop(1).forEach { addText(it) } }.build()
         }
-
-    private fun statusRow(empty: Boolean): Row {
-        val time = updatedAt?.format(TIME_FORMAT).orEmpty()
-        val title = if (lastError == null) {
-            carContext.getString(R.string.status_ok, time)
-        } else {
-            carContext.getString(R.string.status_stale, time)
-        }
-        val row = Row.Builder().setTitle(title)
-        if (empty) row.addText(carContext.getString(R.string.no_content))
-        return row.build()
-    }
 
     private fun listLimit(): Int {
         val limit = if (carContext.carAppApiLevel >= CarAppApiLevels.LEVEL_2) {

@@ -19,7 +19,7 @@ class PageContentExtractorTest {
 
     @Test
     fun `keeps only the main content, one line per block`() {
-        val content = PageContentExtractor.extract(page("""
+        val content = PageContentExtractor.lines(page("""
             <main>
               <h1>Sprawdź wolne miejsca P+R</h1>
               <div class="card"><h3>Czerwone Maki</h3><p>Wolne miejsca: <strong>87</strong></p></div>
@@ -38,37 +38,25 @@ class PageContentExtractorTest {
                 "Parking", "Wolne",
                 "Kurdwanów", "12",
             ),
-            content.lines,
+            content,
         )
     }
 
     @Test
     fun `strips site chrome when there is no main element`() {
-        val content = PageContentExtractor.extract(page("""
+        val content = PageContentExtractor.lines(page("""
             <div id="app"><div class="tile"><span>Bieżanów</span> <span>45</span> wolnych miejsc</div></div>
         """))
 
-        assertEquals(listOf("Bieżanów 45 wolnych miejsc"), content.lines)
+        assertEquals(listOf("Bieżanów 45 wolnych miejsc"), content)
     }
 
     @Test
     fun `keeps header tags that belong to content cards`() {
-        val content = PageContentExtractor.extract(page("""
+        val content = PageContentExtractor.lines(page("""
             <div><article><header>Mały Płaszów</header><p>Wolne: 3</p></article></div>
         """))
 
-        assertEquals(listOf("Mały Płaszów", "Wolne: 3"), content.lines)
-    }
-
-    @Test
-    fun `reports embedded data frames`() {
-        val content = PageContentExtractor.extract(page("""
-            <main><p>Zobacz poniżej: 1</p>
-              <iframe src="https://parking.example.com/pr/widget"></iframe>
-              <iframe src="https://www.youtube.com/embed/abc"></iframe>
-            </main>
-        """))
-
-        assertEquals(listOf("https://parking.example.com/pr/widget"), content.frameUrls)
+        assertEquals(listOf("Mały Płaszów", "Wolne: 3"), content)
     }
 }

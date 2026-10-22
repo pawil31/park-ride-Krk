@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">P+R Kraków</string>
-    <string name="car_title">P+R Kraków</string>
+    <string name="app_name" translatable="false">P+R Kraków</string>
+    <string name="car_title" translatable="false">P+R Kraków</string>
     <string name="refresh">Refresh</string>
-    <string name="status_ok">Updated %1$s · refreshes every minute</string>
-    <string name="status_stale">Refresh failed, data from %1$s</string>
+    <string name="refresh_at">Refresh · %1$s</string>
+    <string name="refresh_failed_at">Failed · %1$s</string>
+    <string name="free">Free: %1$d</string>
+    <string name="free_short" translatable="false">%1$s: %2$d</string>
+    <string name="other_parkings">Other car parks</string>
     <string name="load_error">Could not load ZTP data: %1$s</string>
     <string name="no_content">The ZTP page returned no content</string>
 </resources>
