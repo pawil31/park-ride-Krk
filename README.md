@@ -23,14 +23,23 @@ shows the page's text without header and footer, so the numbers are still visibl
 | `app` | The Android app: Android Auto screen (`car/`), page loading (`data/`), and the phone `MainActivity`. |
 | `web-page` | The ZTP page saved from Chrome, for reference. |
 
-## Build and install
+## Install on your phone
 
-You need Android Studio (or the Android SDK with JDK 17+).
+No Android Studio needed. GitHub builds the app on every push (see `.github/workflows/build.yml`)
+and attaches it to the **latest** release.
+
+1. On the phone, open the repository's **Releases** page on GitHub and open **Latest build**.
+2. Download `park-ride-krk.apk` and open it.
+3. If Android asks, allow your browser to install unknown apps, then tap **Install**.
+
+Every build is signed with the same debug key (`app/debug.keystore`), so a newer APK installs over
+the old one and keeps your settings.
+
+To build it yourself instead (needs JDK 17 and the Android SDK):
 
 ```bash
 ./gradlew :core:test          # parser tests against the saved page
 ./gradlew :app:assembleDebug  # builds app/build/outputs/apk/debug/app-debug.apk
-./gradlew :app:installDebug   # installs on a connected phone
 ```
 
 ## Run it in the car
@@ -44,7 +53,7 @@ Apps installed outside the Play Store only show up in Android Auto after you all
 4. Connect to the car (or start the Desktop Head Unit, see below). **P+R Kraków** appears in the
    app launcher.
 
-### Test on a computer with the Desktop Head Unit (DHU)
+### Optional: test on a computer with the Desktop Head Unit (DHU)
 
 1. Install **Android Auto Desktop Head Unit Emulator** from Android Studio's SDK Manager
    (SDK Tools tab).
