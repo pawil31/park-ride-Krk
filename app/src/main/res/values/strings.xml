@@ -3,14 +3,8 @@
     <string name="app_name">P+R Kraków</string>
     <string name="car_title">P+R Kraków</string>
     <string name="refresh">Refresh</string>
-    <string name="free_of_capacity">Free: %1$d / %2$d</string>
-    <string name="free_only">Free: %1$d</string>
-    <string name="no_free_count">No free-space count</string>
     <string name="status_ok">Updated %1$s · refreshes every minute</string>
     <string name="status_stale">Refresh failed, data from %1$s</string>
-    <string name="status_source">Source: %1$s</string>
-    <string name="status_title">Status</string>
-    <string name="raw_content_hint">Page layout not recognised, showing page text</string>
     <string name="load_error">Could not load ZTP data: %1$s</string>
     <string name="no_content">The ZTP page returned no content</string>
 </resources>

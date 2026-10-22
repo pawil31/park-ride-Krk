@@ -4,13 +4,17 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import java.io.IOException
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * Renders a page in an off-screen WebView so that content filled in by JavaScript is present,
@@ -21,7 +25,10 @@ object WebViewHtmlLoader {
     private const val POLL_INTERVAL_MS = 1_000L
     private const val TIMEOUT_MS = 20_000L
 
-    /** Returns the rendered HTML as soon as [isComplete] accepts it, or the last snapshot on timeout. */
+    /**
+     * Returns the rendered HTML as soon as [isComplete] accepts it, or the last snapshot on timeout.
+     * Throws [IOException] when the page itself fails to load.
+     */
     @SuppressLint("SetJavaScriptEnabled")
     suspend fun load(context: Context, url: String, isComplete: (String) -> Boolean): String =
         withContext(Dispatchers.Main) {
@@ -68,6 +75,14 @@ object WebViewHtmlLoader {
                         // Redirects can finish more than once; keep a single polling loop.
                         handler.removeCallbacks(poll)
                         handler.post(poll)
+                    }
+
+                    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                        if (!request.isForMainFrame) return
+                        release()
+                        if (continuation.isActive) {
+                            continuation.resumeWithException(IOException(error.description.toString()))
+                        }
                     }
                 }
                 // Safety net in case the page never finishes loading.

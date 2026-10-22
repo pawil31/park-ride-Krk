@@ -3,37 +3,30 @@
 Shows how many spaces are free at Kraków's Park & Ride car parks on the car screen, using the data
 published by ZTP at <https://ztp.krakow.pl/parkingi-pr/sprawdz-wolne-miejsca-pr>.
 
-- **Car screen (Android Auto):** a list of car parks with free spaces, colour-coded
-  (green / yellow / red), refreshed every minute while the screen is open. There is also a
-  **Refresh** button. Tap a car park to start navigation to it. The last row shows when the data
-  was last refreshed.
+- **Car screen (Android Auto):** the text of the ZTP page, without the site header, footer and
+  menus, refreshed every minute while the screen is open. There is also a **Refresh** button. The
+  last row shows when the data was last refreshed.
 - **Phone screen:** the ZTP page itself, with the site header, footer and menus hidden, reloaded
   every minute.
 
-Android Auto does not let apps show web pages, so the car screen can't simply embed the website.
-Instead the app downloads the page, removes the header, footer and menus, and turns the
-availability content into a list. If it can't recognise the page layout, it shows the page's
-text as is.
+Android Auto does not let apps show web pages, so the car screen can't embed the website. Instead
+the app loads the page in an invisible browser (so content built by JavaScript is included),
+removes the header, footer and menus, and shows the remaining text as list rows, three lines per
+row. If the page embeds the data from another site in a frame, that frame's text is added too.
 
 ## Project layout
 
 | Module | What it does |
 | --- | --- |
-| `core` | Plain Kotlin + [jsoup]. Downloads and parses the ZTP page (`AvailabilityParser`). Unit-tested. |
-| `app` | The Android app: Android Auto screen (`car/`), data loading (`data/`), and the phone `MainActivity`. |
-
-The app loads data in three steps, stopping at the first one that finds car parks:
-
-1. Download the page's HTML and parse it.
-2. Follow an embedded `<iframe>`, in case the numbers come from a widget.
-3. Render the page in an off-screen WebView, in case the numbers are filled in by JavaScript.
+| `core` | Plain Kotlin + [jsoup]. Turns the page HTML into its content text (`PageContentExtractor`). Unit-tested. |
+| `app` | The Android app: Android Auto screen (`car/`), page loading (`data/`), and the phone `MainActivity`. |
 
 ## Build and install
 
 You need Android Studio (or the Android SDK with JDK 17+).
 
 ```bash
-./gradlew :core:test          # parser unit tests
+./gradlew :core:test          # content extraction tests
 ./gradlew :app:assembleDebug  # builds app/build/outputs/apk/debug/app-debug.apk
 ./gradlew :app:installDebug   # installs on a connected phone
 ```
@@ -62,10 +55,9 @@ Apps installed outside the Play Store only show up in Android Auto after you all
 
 ## Known limits
 
-- The ZTP page is not an official API. If ZTP changes its layout, the parser may no longer
-  recognise the car parks. The car screen then shows the page's text instead, so you still see
-  the numbers. In that case, adjust `AvailabilityParser` and add a test with the new HTML.
-- While driving, Android Auto limits how many rows a list may show (often 6). The app shows as
-  many car parks as allowed and keeps the last row for the refresh status.
+- While driving, Android Auto limits how many rows a list may show (often 6). With three lines per
+  row that is about 15 lines of page text, and the rest is cut off. A later
+  version can pick out just the car parks and their free spaces so they fit.
+- The ZTP page is not an official API. If ZTP changes its layout, the text shown may change too.
 
 [jsoup]: https://jsoup.org/

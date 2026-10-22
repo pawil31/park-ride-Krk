@@ -1,5 +1,6 @@
 package com.pawil31.parkridekrk.core
 
+import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
@@ -7,8 +8,27 @@ import org.jsoup.nodes.TextNode
 import org.jsoup.select.NodeTraversor
 import org.jsoup.select.NodeVisitor
 
+/** Official ZTP page with live P+R availability. */
+const val AVAILABILITY_URL = "https://ztp.krakow.pl/parkingi-pr/sprawdz-wolne-miejsca-pr"
+
+data class PageContent(
+    /** Readable text of the page without header, footer, menus and cookie banners, one line per block. */
+    val lines: List<String>,
+    /** Embedded frames, which may hold the actual availability widget. */
+    val frameUrls: List<String>,
+)
+
 /** Strips site chrome (header, footer, menus, cookie banners) and turns the remaining content into text lines. */
-internal object ContentExtractor {
+object PageContentExtractor {
+
+    fun extract(html: String, baseUri: String = AVAILABILITY_URL): PageContent {
+        val document = Jsoup.parse(html, baseUri)
+        val frameUrls = document.select("iframe[src]")
+            .map { it.absUrl("src") }
+            .filter { it.startsWith("http") && !IGNORED_FRAMES.containsMatchIn(it) }
+            .distinct()
+        return PageContent(lines(contentRoot(document)), frameUrls)
+    }
 
     private val ALWAYS_REMOVE = listOf(
         "script", "style", "noscript", "template", "svg", "nav", "aside",
@@ -27,11 +47,13 @@ internal object ContentExtractor {
         "main", "[role=main]", "#main-content", ".main-content", "#content", "#main", "article",
     )
 
+    private val IGNORED_FRAMES =
+        Regex("""youtube|google\.com/maps|googletagmanager|facebook|recaptcha""", RegexOption.IGNORE_CASE)
     private val DIGIT = Regex("""\d""")
     private val WHITESPACE = Regex("""\s+""")
     private val LINE_BREAKS = setOf("br", "tr", "li", "dt", "dd")
 
-    fun contentRoot(document: Document): Element {
+    private fun contentRoot(document: Document): Element {
         val body = document.body()
         val root = MAIN_CANDIDATES.asSequence()
             .mapNotNull { document.selectFirst(it) }
@@ -56,7 +78,7 @@ internal object ContentExtractor {
         }
     }
 
-    fun lines(root: Element): List<String> {
+    private fun lines(root: Element): List<String> {
         val text = StringBuilder()
         NodeTraversor.traverse(object : NodeVisitor {
             override fun head(node: Node, depth: Int) {
