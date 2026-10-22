@@ -1,0 +1,29 @@
+/*
+Theme Name: Wordpress Theme B4
+Description: Template for Developers, supported by Bootstrap 4
+Version: 3.2
+Author: Łukasz Bogacz
+Author URI: mailto: lukaszbogacz08@gmail.com
+*/
+ 
+@media (min-width: 1024px) {
+  .content {
+    margin-top: -20px; 
+  } 
+}
+ 
+[data-tag], [id] {
+    scroll-margin-top: 50px; 
+}
+
+.highlight-flash {
+    background-color: #fff9c4; 
+    transition: background-color 2s ease-out;
+    border-radius: 4px;
+    
+}
+
+
+.highlight-fade {
+    background-color: transparent !important;
+}
