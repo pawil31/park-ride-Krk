@@ -50,8 +50,21 @@ Apps installed outside the Play Store only show up in Android Auto after you all
    (or open the Android Auto app).
 2. Tap **Version** about 10 times until developer mode turns on.
 3. In the ⋮ menu, open **Developer settings** and enable **Unknown sources**.
-4. Connect to the car (or start the Desktop Head Unit, see [below](#7-optional-car-screen-on-the-computer-desktop-head-unit)).
-   **P+R Kraków** appears in the app launcher.
+4. Connect to the car (or start the Desktop Head Unit, see below). **P+R Kraków** appears in the
+   app launcher.
+
+### Optional: test on a computer with the Desktop Head Unit (DHU)
+
+1. Install **Android Auto Desktop Head Unit Emulator** from Android Studio's SDK Manager
+   (SDK Tools tab).
+2. On the phone, in Android Auto's ⋮ menu, choose **Start head unit server**.
+3. Run:
+   ```bash
+   adb forward tcp:5277 tcp:5277
+   $ANDROID_SDK_ROOT/extras/google/auto/desktop-head-unit
+   ```
+
+Without Android Studio, see [step 7 of the adb manual](#7-optional-car-screen-on-the-computer-desktop-head-unit).
 
 ## Debug with adb only
 
