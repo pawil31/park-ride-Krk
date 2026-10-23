@@ -40,13 +40,18 @@ class AvailabilityRepository(private val context: Context) {
             }
             if (html != null) {
                 val parkings = ParkingParser.parse(html)
-                if (parkings.isNotEmpty()) return Availability(parkings, emptyList())
+                if (parkings.isNotEmpty()) {
+                    Log.i(TAG, "Downloaded page: ${parkings.size} car parks")
+                    return Availability(parkings, emptyList())
+                }
+                Log.i(TAG, "Downloaded page has no car parks, switching to the rendered page")
                 needsJavaScript = true
             }
         }
 
         val html = WebViewHtmlLoader.load(context, AVAILABILITY_URL) { ParkingParser.parse(it).isNotEmpty() }
         val parkings = ParkingParser.parse(html)
+        Log.i(TAG, "Rendered page: ${parkings.size} car parks")
         return Availability(parkings, if (parkings.isEmpty()) PageContentExtractor.lines(html) else emptyList())
     }
 
