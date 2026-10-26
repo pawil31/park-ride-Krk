@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="refresh">Odśwież</string>
+    <string name="refresh_at">Odśwież · %1$s</string>
+    <string name="refresh_failed_at">Błąd · %1$s</string>
+    <string name="free">Wolnych: %1$d</string>
+    <string name="other_parkings">Pozostałe parkingi</string>
+    <string name="load_error">Nie udało się pobrać danych ZTP: %1$s</string>
+    <string name="no_content">Strona ZTP nie zwróciła treści</string>
+</resources>

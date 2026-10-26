@@ -33,3 +33,6 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Shared debug key, so each CI build installs over the previous one
+!app/debug.keystore

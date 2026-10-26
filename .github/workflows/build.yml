@@ -1,0 +1,41 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Test and build
+        run: ./gradlew :core:test :app:assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish APK as the "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk park-ride-krk.apk
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest park-ride-krk.apk \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Latest build (${GITHUB_REF_NAME})" \
+            --notes "Built from ${GITHUB_SHA}. Download park-ride-krk.apk on your phone and open it to install."
