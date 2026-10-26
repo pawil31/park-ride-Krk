@@ -9,12 +9,14 @@ import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarColor
+import androidx.car.app.model.CarIcon
 import androidx.car.app.model.ForegroundCarColorSpan
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.car.app.versioning.CarAppApiLevels
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -23,6 +25,7 @@ import com.pawil31.parkridekrk.core.Occupancy
 import com.pawil31.parkridekrk.core.ParkingAvailability
 import com.pawil31.parkridekrk.data.Availability
 import com.pawil31.parkridekrk.data.AvailabilityRepository
+import com.pawil31.parkridekrk.data.Favorites
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -39,6 +42,7 @@ import java.time.format.DateTimeFormatter
 class AvailabilityScreen(
     carContext: CarContext,
     private val repository: AvailabilityRepository,
+    private val favorites: Favorites,
 ) : Screen(carContext) {
 
     private var availability: Availability? = null
@@ -92,7 +96,7 @@ class AvailabilityScreen(
         }
 
         val rows = when {
-            data.parkings.isNotEmpty() -> parkingRows(data.parkings, listLimit())
+            data.parkings.isNotEmpty() -> parkingRows(data.parkings.sortedByDescending { it.name in favorites }, listLimit())
             else -> pageTextRows(data.pageText).take(listLimit())
         }
         val list = ItemList.Builder()
@@ -130,10 +134,30 @@ class AvailabilityScreen(
         return parkings.take(limit - 1).map(this::parkingRow) + overflow.build()
     }
 
+    /**
+     * The star button on the right stars or unstars a car park. Hosts older than API level 6 have no
+     * row buttons, so there tapping the row toggles it and a star in the title marks it.
+     */
     private fun parkingRow(parking: ParkingAvailability): Row {
         val text = SpannableStringBuilder()
         appendColored(text, carContext.getString(R.string.free, parking.freeSpaces), parking)
-        return Row.Builder().setTitle(shortName(parking)).addText(text).build()
+        val starred = parking.name in favorites
+        val toggle = { favorites.toggle(parking.name); invalidate() }
+        val row = Row.Builder().addText(text)
+        if (carContext.carAppApiLevel >= CarAppApiLevels.LEVEL_6) {
+            row.setTitle(shortName(parking)).addAction(starAction(starred, toggle))
+        } else {
+            row.setTitle(if (starred) "$STAR ${shortName(parking)}" else shortName(parking)).setOnClickListener(toggle)
+        }
+        return row.build()
+    }
+
+    private fun starAction(starred: Boolean, onClick: () -> Unit): Action {
+        val icon = CarIcon.Builder(
+            IconCompat.createWithResource(carContext, if (starred) R.drawable.ic_star else R.drawable.ic_star_border),
+        )
+        if (starred) icon.setTint(CarColor.YELLOW)
+        return Action.Builder().setIcon(icon.build()).setOnClickListener(onClick).build()
     }
 
     private fun appendColored(text: SpannableStringBuilder, part: String, parking: ParkingAvailability) {
@@ -177,6 +201,7 @@ class AvailabilityScreen(
         const val REFRESH_INTERVAL_MS = 60_000L
         const val DEFAULT_LIST_LIMIT = 6
         const val LINES_PER_ROW = 3
+        const val STAR = "★"
         val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     }
 }
